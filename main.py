@@ -184,7 +184,8 @@ def work_from_text_and_tables(tuple_task, tables, project, user):
             a = text['text']
             result = list(set(a) & set(b))
             if result.__len__() == table.__len__():
-                create_table_and_request(table_app, text['task'], text['text'], project, user)
+                c = list(set(text['text'])-set(result))
+                create_table_and_request(table_app, text['task'], c, project, user)
 
 
 def work_in_file(dir, user):
@@ -200,7 +201,7 @@ def work_in_file(dir, user):
 
         TaskText = work_from_text(all_task, all_text)  # Соединение задачи и текста
         tables = ParserFile.get_tables(treeFile)  # Получение всех таблиц
-        send_request(user, TaskText, currentFile.name)
+        # send_request(user, TaskText, currentFile.name)
         work_from_text_and_tables(TaskText, tables, currentFile.name, user)  # Соединение таблицы и задачи
 
         print(1)
