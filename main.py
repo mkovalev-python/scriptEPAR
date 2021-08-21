@@ -1,3 +1,4 @@
+import os
 import pathlib
 import zipfile
 import xml.etree.ElementTree
@@ -102,7 +103,13 @@ def work_from_text(tasks, text):
         try:
             index_start = text.index(task)
         except ValueError:
-            index_start = index_stop
+            try:
+                index_start = index_stop
+            except:
+                for el in text:
+                    if task_next in el:
+                        index_start = text.index(el)
+                        break
         try:
             index_stop = text.index(task_next)
         except ValueError:
@@ -114,7 +121,10 @@ def work_from_text(tasks, text):
         i += 1
         task_and_text.append({'task': task, 'text': text_task})
     a = tasks[-1]
-    task_and_text.append({'task': tasks[-1], 'text': text[text.index(a):]})
+    try:
+        task_and_text.append({'task': tasks[-1], 'text': text[text.index(a):]})
+    except ValueError:
+        pass
 
     return task_and_text
 
@@ -125,7 +135,7 @@ def send_request(user, task, project):
         for text in el['text']:
             TEXT += f'\n\t{text}'
 
-        response = requests.post('http://127.0.0.1:8000/create-task/',
+        response = requests.post('http://127.0.0.1:8000/api-create-task/',
                                  data={
                                      "user": user,
                                      "task": el['task'],
@@ -138,7 +148,7 @@ def send_request(user, task, project):
 
 def send_file_request(name, task, text, project, user):
     file_ob = {'uploaded_file': open(name, 'rb')}
-    response = requests.post('http://127.0.0.1:8000/create-task/',
+    response = requests.post('http://127.0.0.1:8000/api-past-file/',
                              files=file_ob,
                              data={
                                  "user": user,
@@ -148,6 +158,7 @@ def send_file_request(name, task, text, project, user):
                              })
     if response.status_code == 200:
         print(f'Отправлен файл в задачу {task[:30]}')
+        os.remove(name)
 
 
 def create_table_and_request(table1, task, text, project, user):
