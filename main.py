@@ -1,3 +1,4 @@
+import json
 import os
 import pathlib
 import zipfile
@@ -112,6 +113,13 @@ def work_in_file(dir, user):
         for task in all_tasks_notclear:
             tasks.append(ParserFile.clear_num_page_in_task(task))
         task_tree = ParserFile.tree_tasks(tasks)  # Создание дерева задач
+
+        response = requests.post('http://127.0.0.1:8081/api-create-task/',
+                                 data={
+                                     "user": user,
+                                     "task": json.dumps(task_tree),
+                                     'project': currentFile.stem.replace('Отчет', "")
+                                 })
         print(1)
 
 
