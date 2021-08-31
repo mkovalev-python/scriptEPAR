@@ -1,6 +1,7 @@
 import json
 import os
 import pathlib
+import re
 import zipfile
 import xml.etree.ElementTree
 import pandas as pd
@@ -67,11 +68,10 @@ class ParserFile:
     @staticmethod
     def tree_tasks(tasks):
         LIST_TASK_FILTERED = []
-        task_tree_list = []
+        task_tree_list = {}
         for task in tasks:
             task_split = task.split('.')
             index = 0
-            header1 = []
 
             for el in task_split:
                 try:
@@ -79,34 +79,25 @@ class ParserFile:
                     index += 1
                 except ValueError:
                     break
+
             if index == 1:
-                header2 = []
-                header3 = []
-                header4 = []
-                header1.append(task[2:])
-                task_tree = {'H1': header1}
-                task_tree_list.append(task_tree)
+                task_tree_list[task_split[0]] = task[2:]
                 LIST_TASK_FILTERED.append(task[2:])
             if index == 2:
-                del task_tree_list[-1]
-                header2.append(task[4:])
-                task_tree.update({'H2': header2})
-                task_tree_list.append(task_tree)
+                task_tree_list[f"{task_split[0]}{task_split[1]}"] = task[4:]
                 LIST_TASK_FILTERED.append(task[4:])
             if index == 3:
-                del task_tree_list[-1]
-                header3.append(task[6:])
-                task_tree.update({'H3': header3})
-                task_tree_list.append(task_tree)
+                task_tree_list[f"{task_split[0]}{task_split[1]}{task_split[2]}"] = task[6:]
                 LIST_TASK_FILTERED.append(task[6:])
             if index == 4:
-                del task_tree_list[-1]
-                header4.append(task[8:])
-                task_tree.update({'H4': header4})
-                task_tree_list.append(task_tree)
+                task_tree_list[f"{task_split[0]}{task_split[1]}{task_split[2]}{task_split[3]}"] = task[8:]
                 LIST_TASK_FILTERED.append(task[8:])
+            if index == 5:
+                task_tree_list[f"{task_split[0]}{task_split[1]}{task_split[2]}{task_split[3]}{task_split[4]}"] = task[
+                                                                                                                 10:]
+                LIST_TASK_FILTERED.append(task[10:])
 
-        return (task_tree_list, LIST_TASK_FILTERED)
+        return task_tree_list, LIST_TASK_FILTERED
 
     @staticmethod
     def all_text_in_doc(file):
@@ -131,14 +122,25 @@ class ParserFile:
                 stop_task = stop_task[1:]
             for text in all_text:
                 text_clear = ParserFile.clear_num_page_in_task(text)
-                if text_clear.strip().replace("\xa0", " ").replace("\n", "") == start_task.strip().replace("\xa0", " "):
+                if text_clear.strip().replace("\xa0", " ").replace("\n", "").replace(' ', '').replace(' ', '').replace(
+                        '…', '').replace('.', '') == start_task.strip().replace("\xa0", " ").replace(' ', '').replace(
+                        ' ', '').replace('…', '').replace('.', '') or text_clear.strip().replace("\xa0", " ").replace(
+                        "\n", "").replace(' ', '').replace(' ', '').replace('…', '').replace('.',
+                                                                                             '') == start_task.strip().replace(
+                        "\xa0", "").replace(' ', '').replace(' ', '').replace('…', '').replace('.', ''):
                     index_start = all_text.index(text)
-                elif text_clear.strip().replace("\xa0", " ").replace("\n", "") == stop_task.strip().replace("\xa0",
-                                                                                                            " "):
+                elif text_clear.strip().replace("\xa0", " ").replace("\n", "").replace(' ', '').replace(' ',
+                                                                                                        '').replace('…',
+                                                                                                                    '').replace(
+                        '.', '') == stop_task.strip().replace("\xa0", " ").replace(' ', '').replace(' ', '').replace(
+                        '…', '').replace('.', '') or text_clear.strip().replace("\xa0", " ").replace("\n", "").replace(
+                        ' ', '').replace(' ', '').replace('…', '').replace('.', '') == start_task.strip().replace(
+                        "\xa0", "").replace(' ', '').replace(' ', '').replace('…', '').replace('.', ''):
                     index_stop = all_text.index(text)
+                    break
                 else:
                     continue
-            return all_text[index_start + 1:index_stop], index_stop - 1
+            return all_text[index_start + 1:index_stop], index_stop
         else:
             if start_task[0] == '.':
                 start_task = start_task[1:]
@@ -155,53 +157,58 @@ class ParserFile:
         for table in document.tables:
             print(1)
             for row in table.rows:
-                print(1)
+                print(row.text)
+                for col in table.columns:
+                    print(col.text)
+        print(1)
 
 
 def work_in_file(dir, user):
-    for currentFile in dir.iterdir():
-        treeFile = ParserFile.open_file(currentFile)  # Получаем дерево обьектов файла
-        if not treeFile:
-            continue
-        all_text = ParserFile.get_all_text(treeFile)  # Получаем весь текст файла
-        all_tasks_notclear = ParserFile.find_tasks(all_text)  # Поиск всех задач из файла
-        tasks = []
-        for task in all_tasks_notclear:
-            tasks.append(ParserFile.clear_num_page_in_task(task))
-        task_tree = ParserFile.tree_tasks(tasks)  # Создание дерева задач
+    try:
+        for currentFile in dir.iterdir():
+            treeFile = ParserFile.open_file(currentFile)  # Получаем дерево обьектов файла
+            if not treeFile:
+                continue
+            all_text = ParserFile.get_all_text(treeFile)  # Получаем весь текст файла
+            all_tasks_notclear = ParserFile.find_tasks(all_text)  # Поиск всех задач из файла
+            tasks = []
+            for task in all_tasks_notclear:
+                tasks.append(ParserFile.clear_num_page_in_task(task))
+            task_tree = ParserFile.tree_tasks(tasks)  # Создание дерева задач
 
-        response = requests.post('http://94.26.245.131/api-create-task/',
-                                 data={
-                                     "user": user,
-                                     "task": json.dumps(task_tree[0]),
-                                     'project': currentFile.stem.replace('Отчет', "")
-                                 })
-        text_filtered = ParserFile.all_text_in_doc(currentFile)
+            # response = requests.post('http://94.26.245.131/api-create-task/',
+            #                          data={
+            #                              "user": user,
+            #                              "task": json.dumps(task_tree[0]),
+            #                              'project': currentFile.stem.replace('Отчет', "")
+            #                          })
+            text_filtered = ParserFile.all_text_in_doc(currentFile)
 
-        index = 0
-        i = 0
-        while i < task_tree[1].__len__():
-            try:
-                task_text = ParserFile.task_text(task_tree[1][i], task_tree[1][i + 1], text_filtered[index:])
-                index = task_text[1]
-                i += 1
-            except IndexError:
-                task_text = ParserFile.task_text(task_tree[1][i], False, text_filtered[index:])
-                i += 1
+            index = 0
+            i = 0
+            while i < task_tree[1].__len__() - 1:
+                try:
+                    task_text = ParserFile.task_text(task_tree[1][i], task_tree[1][i + 1], text_filtered[index:])
+                    index += task_text[1]
+                    i += 1
+                except IndexError:
+                    task_text = ParserFile.task_text(task_tree[1][i], False, text_filtered[index:])
+                    i += 1
 
-            glue_text = ''
-            for text in task_text[0]:
-                glue_text += f'\n\t{text}'
+                glue_text = ''
+                for text in task_text[0]:
+                    glue_text += f'\n\t{text}'
 
-            response = requests.post('http://94.26.245.131/api-create-text/',
-                                     data={
-                                         "user": user,
-                                         "task": task_tree[1][i],
-                                         "text": glue_text,
-                                         'project': currentFile.stem.replace('Отчет', "")
-                                     })
-
-            print(task_tree[1][i])
+                # response = requests.post('http://94.26.245.131/api-create-text/',
+                #                          data={
+                #                              "user": user,
+                #                              "task": task_tree[1][i],
+                #                              "text": glue_text,
+                #                              'project': currentFile.stem.replace('Отчет', "")
+                #                          })
+                print(1)
+    except KeyError:
+        pass
 
 
 def start():
